@@ -3,8 +3,6 @@
 
 #include <Arduino.h>
 #include <EthernetESP32.h>
-#include <EthernetClient.h>
-#include "../https/carmeleonHttpSecure.h"
 
 class carmeleonClient {
 public:

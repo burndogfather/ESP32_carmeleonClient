@@ -17,7 +17,7 @@ class carmeleonHttpSecure {
 public:
   carmeleonHttpSecure();
 
-  bool begin(const char* fullUrl);  // e.g., https://host:port/path
+  bool begin(const char* fullUrl);  // 예: https://host:port/path
   void header(const String& name, const String& value);
   int get();
   int post(const String& body, const String& contentType = "application/json");
