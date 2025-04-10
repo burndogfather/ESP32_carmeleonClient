@@ -1,5 +1,5 @@
-#ifndef CARMELEON_HTTP_SECURE_H
-#define CARMELEON_HTTP_SECURE_H
+#ifndef HTTP_SECURE_H
+#define HTTP_SECURE_H
 
 #include <Arduino.h>
 #include <map>
