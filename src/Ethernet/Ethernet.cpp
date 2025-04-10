@@ -44,6 +44,19 @@ static void ethEventCB(void *arg, esp_event_base_t event_base, int32_t event_id,
 }
 
 void EthernetClass::init(EthDriver& ethDriver) {
+  static bool printed = false;
+  if (!printed && Serial) {
+    printed = true;
+    Serial.println();
+    Serial.println("    _____   ___  ______ ___  ___ _____  _      _____  _____  _   _");
+    Serial.println("   /  __ \\ / _ \\ | ___ \\|  \\/  ||  ___|| |    |  ___||  _  || \\ | |");
+    Serial.println("   | /  \\// /_\\ \\| |_/ /| .  . || |__  | |    | |__  | | | ||  \\| |");
+    Serial.println("   | |    |  _  ||    / | |\\/| ||  __| | |    |  __| | | | || . ` |");
+    Serial.println("   | \\__/\\| | | || |\\ \\ | |  | || |___ | |____| |___ \\ \\_/ /| |\\  |");
+    Serial.println("    \\____/\\_| |_/\\_| \\_|\\_|  |_/\\____/ \\_____/\\____/  \\___/ \\_| \\_/");
+    Serial.println("                              DADOL corp");
+    Serial.println();
+  }
   driver = &ethDriver;
 }
 
