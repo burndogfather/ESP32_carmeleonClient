@@ -20,7 +20,9 @@ bool carmeleonClient::connectToServer(const char* host, uint16_t port) {
   Serial.println("서버 연결 성공");
   client.stop();
   return true;
+
 }
+
 
 void carmeleonClient::loop() {
   Ethernet.maintain();

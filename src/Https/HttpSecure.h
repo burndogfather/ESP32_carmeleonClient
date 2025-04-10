@@ -13,9 +13,9 @@ extern "C" {
   #include "mbedtls/error.h"
 }
 
-class carmeleonHttpSecure {
+class HttpSecure {
 public:
-  carmeleonHttpSecure();
+  HttpSecure();
 
   bool begin(const char* fullUrl);  // 예: https://host:port/path
   void header(const String& name, const String& value);
