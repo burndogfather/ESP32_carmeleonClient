@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <map>
+#include <vector>
 
 extern "C" {
   #include "lwip/sockets.h"
@@ -21,6 +22,7 @@ public:
   bool begin(const char* fullUrl);  // 예: https://host:port/path
   void requestHeader(const String& name, const String& value);
   String responseHeader(const String& name);
+  void printAllResponseHeaders();
   int get();
   int post(const String& body, const String& contentType = "application/json");
   int put(const String& body, const String& contentType);
@@ -33,7 +35,7 @@ public:
   void clearAllCookies();
   void end();
 
-  void debugFilesystem();
+  void debugCookiesystem();
 
 private:
   bool _isSecure = false;
@@ -51,8 +53,9 @@ private:
 
   int _statusCode = -1;
   String _response;
-  std::map<String, String> _responseHeaders;
+  std::map<String, std::vector<String>> _responseHeaders;
 
+  void suppressLittleFSErrors();
   int _write(const uint8_t* buf, size_t len);
   int _read(uint8_t* buf, size_t len);
   void sendRequest(const String& method, const String& body = "", const String& contentType = "");
@@ -60,7 +63,9 @@ private:
   String getCookieFilePath();
   void processSetCookieHeader(const String& cookieHeader);
   void storeCookieToLittleFS(const String& name, const String& value, time_t expire);
+  
   String getValidCookiesFromLittleFS();
+  time_t parseGMTToTimeT(const String& gmtStr);
   
 };
 
