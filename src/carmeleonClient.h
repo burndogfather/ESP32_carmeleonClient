@@ -7,7 +7,7 @@
 class carmeleonClient {
 public:
   EthernetClass Ethernet;
-  HttpSecure http;
+  HttpSecure Http;
 
   carmeleonClient();
 
