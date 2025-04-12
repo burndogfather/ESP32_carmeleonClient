@@ -230,8 +230,8 @@ bool EthernetClass::setNTP(const char* ntpServer, long gmtOffset_sec, int daylig
   // 시간 동기화 대기 (최대 10초)
   time_t now = 0;
   int retry = 0;
-  while ((now = time(nullptr)) < 24 * 3600 && retry++ < 10) {
-    delay(1000);
+  while ((now = time(nullptr)) < 24 * 3600 && retry++ < 100) {
+    delay(100);  // 0.1초마다 체크 → 최대 10초
   }
 
   if (now < 24 * 3600) {

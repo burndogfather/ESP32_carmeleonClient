@@ -21,6 +21,14 @@ class HttpSecure {
 public:
   HttpSecure();
 
+  bool handshake(const char* wsUrl);
+  void sendMsgString(const String& message);
+  void sendMsgBinary(const std::vector<uint8_t>& data);
+  void onConnected(std::function<void()> cb);
+  void onDisconnected(std::function<void()> cb);
+  void onMsgString(std::function<void(String)> cb);
+  void onMsgBinary(std::function<void(std::vector<uint8_t>)> cb); 
+
   bool begin(const char* fullUrl);  // 예: https://host:port/path
   void requestHeader(const String& name, const String& value);
   String responseHeader(const String& name);
@@ -45,9 +53,13 @@ public:
 
 private:
 
+  bool _isWebSocket = false;
   bool _littlefsInitialized = false;
   bool _littlefsSuccess = false;  // 초기화 성공 여부
+
+  TaskHandle_t _wsRecvTask = nullptr;
   TaskHandle_t _littlefsTask = NULL;
+
   struct LittleFSTaskParams {
     bool* pInitialized;
     bool* pSuccess;
@@ -69,7 +81,17 @@ private:
   String _response;
   std::map<String, std::vector<String>> _responseHeaders;
 
+  std::function<void()> _onConnected;
+  std::function<void()> _onDisconnected;
+  std::function<void(String)> _onMessage; // 텍스트 메시지
+  std::function<void(std::vector<uint8_t>)> _onMessageBinary;  // 바이너리 메시지
+
   static void littleFSTask(void* params);
+  static void websocketRecvTask(void* arg);
+  void sendPong(const std::vector<uint8_t>& payload);
+
+  void sendFrame(const String& message);
+  void readFrame();
 
   int _write(const uint8_t* buf, size_t len);
   int _read(uint8_t* buf, size_t len);

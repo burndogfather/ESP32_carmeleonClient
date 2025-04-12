@@ -18,6 +18,8 @@
 #include <LittleFS.h>
 #include "esp_log.h"
 
+#include "mbedtls/base64.h"
+
 HttpSecure::HttpSecure() {
   
   mbedtls_ssl_init(&_ssl);
@@ -72,6 +74,16 @@ void HttpSecure::littleFSTask(void* params) {
   vTaskDelete(NULL);
 }
 
+
+void HttpSecure::websocketRecvTask(void* arg) {
+  HttpSecure* self = static_cast<HttpSecure*>(arg);
+  while (self->_connected) {
+    self->readFrame();  // 프레임 읽기
+    vTaskDelay(10 / portTICK_PERIOD_MS);  // 약간의 휴식
+  }
+  vTaskDelete(NULL);
+}
+
 bool HttpSecure::begin(const char* fullUrl) {
 
   // 기존 연결 및 SSL 상태 정리
@@ -116,6 +128,14 @@ bool HttpSecure::begin(const char* fullUrl) {
   } else if (lower.startsWith("http://")) {
     _isSecure = false;
     url = url.substring(7);
+    _port = (_port == 0) ? 80 : _port;
+  } else if (lower.startsWith("wss://")) {
+    _isSecure = true;
+    url = url.substring(6);
+    _port = (_port == 0) ? 443 : _port;
+  } else if (lower.startsWith("ws://")) {
+    _isSecure = false;
+    url = url.substring(5);
     _port = (_port == 0) ? 80 : _port;
   } else {
     Serial.println("[HTTP] 지원하지 않는 프로토콜");
@@ -219,6 +239,246 @@ bool HttpSecure::begin(const char* fullUrl) {
   return true;
 }
 
+
+bool HttpSecure::handshake(const char* wsUrl) {
+  if (!begin(wsUrl)) return false;
+
+  _isWebSocket = true;
+  uint8_t randomKey[16];
+  esp_fill_random(randomKey, sizeof(randomKey));
+  size_t encodedLen;
+  uint8_t encodedBuf[32]; // 16바이트 → Base64 (24바이트 + 널 종료)
+  mbedtls_base64_encode(encodedBuf, sizeof(encodedBuf), &encodedLen, 
+                       randomKey, sizeof(randomKey));
+
+  String key = String((char*)encodedBuf);
+
+  requestHeader("Upgrade", "websocket");
+  requestHeader("Connection", "Upgrade");
+  requestHeader("Sec-WebSocket-Key", key);
+  requestHeader("Sec-WebSocket-Version", "13");
+
+  int status = get();
+  if (status == 101) {
+    _connected = true;
+    if (_onConnected) {
+      _onConnected();
+    }
+
+    if (_wsRecvTask == nullptr) {
+      xTaskCreate(
+        websocketRecvTask,
+        "ws_recv_task",
+        4096,
+        this,
+        1,
+        &_wsRecvTask
+      );
+    }
+
+    return true;
+  }
+  return false;
+}
+
+
+
+
+void HttpSecure::sendMsgString(const String& message) {
+  if (!_connected) return;
+  sendFrame(message);
+}
+
+void HttpSecure::sendMsgBinary(const std::vector<uint8_t>& data) {
+  if (!_connected) return;
+
+  uint8_t header[10];
+  size_t len = data.size();
+  size_t offset = 2;
+
+  header[0] = 0x82;  // FIN + opcode 0x2 (binary)
+  if (len <= 125) {
+    header[1] = len;
+  } else if (len <= 65535) {
+    header[1] = 126;
+    header[2] = (len >> 8) & 0xFF;
+    header[3] = len & 0xFF;
+    offset = 4;
+  } else {
+    header[1] = 127;
+    // 64bit 길이는 생략 (필요시 추가 구현)
+    return;
+  }
+
+  _write(header, offset);
+  _write(data.data(), len);
+}
+
+
+void HttpSecure::sendFrame(const String& message) {
+  uint8_t header[10];
+  size_t len = message.length();
+  size_t offset = 2;
+
+  header[0] = 0x81; // FIN + text frame
+  if (len <= 125) {
+    header[1] = len;
+  } else if (len <= 65535) {
+    header[1] = 126;
+    header[2] = (len >> 8) & 0xFF;
+    header[3] = len & 0xFF;
+    offset = 4;
+  } else {
+    header[1] = 127;
+    // 64bit length not handled for simplicity
+  }
+
+  _write(header, offset);
+  _write((const uint8_t*)message.c_str(), len);
+}
+
+void HttpSecure::readFrame() {
+  if (!_connected) return;
+
+  uint8_t hdr[2];
+  int hdrLen = _read(hdr, 2);
+  if (hdrLen <= 0) {
+    if (_onDisconnected) _onDisconnected();
+    end();
+    return;
+  }
+
+  uint8_t opcode = hdr[0] & 0x0F;
+  bool isMasked = hdr[1] & 0x80;
+  uint64_t payloadLen = hdr[1] & 0x7F;
+
+  // 확장 payload 길이 처리
+  if (payloadLen == 126) {
+    uint8_t ext[2];
+    if (_read(ext, 2) != 2) { end(); return; }
+    payloadLen = (ext[0] << 8) | ext[1];
+  } else if (payloadLen == 127) {
+    uint8_t ext[8];
+    if (_read(ext, 8) != 8) { end(); return; }
+    payloadLen = 0;
+    for (int i = 0; i < 4; ++i) payloadLen = (payloadLen << 8) | ext[i + 4];
+  }
+
+  if (payloadLen > 4096) {
+    Serial.println("[HTTP] WS Payload too large");
+    end();
+    return;
+  }
+
+  uint8_t mask[4] = {0};
+  if (isMasked) {
+    if (_read(mask, 4) != 4) { end(); return; }
+  }
+
+  std::vector<uint8_t> payload(payloadLen);
+  size_t totalRead = 0;
+  while (totalRead < payloadLen) {
+    int r = _read(payload.data() + totalRead, payloadLen - totalRead);
+    if (r <= 0) { end(); return; }
+    totalRead += r;
+  }
+
+  if (isMasked) {
+    for (size_t i = 0; i < payloadLen; ++i) {
+      payload[i] ^= mask[i % 4];
+    }
+  }
+
+
+  switch (opcode) {
+    case 0x1: {// Text Frame
+      payload.push_back(0);  // null-terminate
+      String msg = String((char*)payload.data());
+      if (_onMessage) _onMessage(msg);
+    
+      // 🔁 "ping" (대소문자 무시) → "pong" 문자열로 응답
+      msg.toLowerCase();
+      if (msg == "ping") {
+        sendMsgString("pong");
+      }
+      break;
+    }
+
+    case 0x2: { // Binary Frame
+      if (_onMessageBinary) {
+        _onMessageBinary(payload);  // 바이너리 콜백 호출
+      }
+      break;
+    }
+
+    case 0x8: {// Close Frame
+      if (_onMessage && payloadLen > 0) {
+        payload.push_back(0);
+        _onMessage(String((char*)payload.data()));
+      }
+      if (_onDisconnected) _onDisconnected();
+      end();  // 연결 종료
+      break;
+    }
+    case 0x9: {// Ping → Pong 응답
+      sendPong(payload);
+      break;
+    }
+    case 0xA: {// Pong (무시 가능)
+      break;
+    }
+    default:{
+      Serial.printf("[HTTP] 알 수 없는 WS opcode: 0x%02X\n", opcode);
+      break;
+    }
+  }
+}
+
+void HttpSecure::sendPong(const std::vector<uint8_t>& payload) {
+  if (!_connected) return;
+
+  uint8_t header[2];
+  size_t len = payload.size();
+  size_t offset = 2;
+
+  header[0] = 0x8A; // FIN + pong
+  if (len <= 125) {
+    header[1] = len;
+  } else if (len <= 65535) {
+    header[1] = 126;
+    header[2] = (len >> 8) & 0xFF;
+    header[3] = len & 0xFF;
+    offset = 4;
+  } else {
+    header[1] = 127;
+    // 64bit 길이까지 대응하지 않음
+    return;
+  }
+
+  _write(header, offset);
+  if (len > 0) _write(payload.data(), len);
+}
+
+
+
+
+
+void HttpSecure::onConnected(std::function<void()> cb) {
+  _onConnected = cb;
+}
+
+void HttpSecure::onDisconnected(std::function<void()> cb) {
+  _onDisconnected = cb;
+}
+
+void HttpSecure::onMsgString(std::function<void(String)> cb) {
+  _onMessage = cb;
+}
+void HttpSecure::onMsgBinary(std::function<void(std::vector<uint8_t>)> cb) {
+  _onMessageBinary = cb;
+}
+
+
 void HttpSecure::requestHeader(const String& name, const String& value) {
   _headers[name] = value;
 }
@@ -310,14 +570,27 @@ int HttpSecure::statusCode() {
 }
 
 void HttpSecure::end() {
-  if (_isSecure) {
-    mbedtls_ssl_close_notify(&_ssl);
-    mbedtls_ssl_free(&_ssl);
-    mbedtls_ssl_config_free(&_conf);
-    mbedtls_ctr_drbg_free(&_ctr_drbg);
+  bool wasConnected = _connected;
+
+  if (_connected) {
+    if (_isSecure) {
+      mbedtls_ssl_close_notify(&_ssl);
+      mbedtls_ssl_free(&_ssl);
+      mbedtls_ssl_config_free(&_conf);
+      mbedtls_ctr_drbg_free(&_ctr_drbg);
+    }
+
+    if (_wsRecvTask) {
+      TaskHandle_t tmp = _wsRecvTask;
+      _wsRecvTask = nullptr;
+      vTaskDelete(tmp);
+    }
+
+    close(_socket);
+    _connected = false;
+    _isWebSocket = false;
+    if (wasConnected && _onDisconnected) _onDisconnected();
   }
-  close(_socket);
-  _connected = false;
 }
 
 int HttpSecure::_write(const uint8_t* buf, size_t len) {
@@ -457,6 +730,10 @@ void HttpSecure::readResponse() {
             }
           }
         }
+
+        // WebSocket이면 여기서 끝냄
+        if (_isWebSocket) return;
+
       }
     } else {
       _response += buf;
@@ -699,6 +976,14 @@ String HttpSecure::getValidCookiesFromLittleFS() {
 
 
 void HttpSecure::printAllCookies() {
+
+  if (!_littlefsInitialized) {
+    if (!LittleFS.begin(false, "/spiffs", 10, "spiffs")) {
+      Serial.println("[HTTP] clearAllCookies 실패 - LittleFS 마운트되지 않음");
+      return;
+    }
+  }
+
   String path = getCookieFilePath();
   time_t now = time(nullptr);
 
@@ -738,6 +1023,14 @@ void HttpSecure::printAllCookies() {
 }
 
 void HttpSecure::clearAllCookies() {
+
+  if (!_littlefsInitialized) {
+    if (!LittleFS.begin(false, "/spiffs", 10, "spiffs")) {
+      Serial.println("[HTTP] clearAllCookies 실패 - LittleFS 마운트되지 않음");
+      return;
+    }
+  }
+
   String dirPath = "/cookies";
 
   File dir = LittleFS.open(dirPath, "w+");
@@ -766,8 +1059,10 @@ void HttpSecure::clearAllCookies() {
 String HttpSecure::getCookie(const String& domain, const String& name) {
 
   if (!_littlefsInitialized) {
-    Serial.println("[HTTP] 오류! begin() 이후 사용이 가능합니다");
-    return "";
+    if (!LittleFS.begin(false, "/spiffs", 10, "spiffs")) {
+      Serial.println("[HTTP] clearAllCookies 실패 - LittleFS 마운트되지 않음");
+      return "";
+    }
   }
 
   String path = "/cookies/" + domain + ".json";
@@ -806,8 +1101,10 @@ void HttpSecure::setCookie(const String& domain, const String& name, const Strin
   }
 
   if (!_littlefsInitialized) {
-    Serial.println("[HTTP] 오류! begin() 이후 사용이 가능합니다");
-    return;
+    if (!LittleFS.begin(false, "/spiffs", 10, "spiffs")) {
+      Serial.println("[HTTP] clearAllCookies 실패 - LittleFS 마운트되지 않음");
+      return;
+    }
   }
 
   if (expire == 0) expire = time(nullptr) + 86400 * 30; // 기본 유효기간: 30일
@@ -858,8 +1155,10 @@ void HttpSecure::setCookie(const String& domain, const String& name, const Strin
 void HttpSecure::removeCookie(const String& domain, const String& name) {
 
   if (!_littlefsInitialized) {
-    Serial.println("[HTTP] 오류! begin() 이후 사용이 가능합니다");
-    return;
+    if (!LittleFS.begin(false, "/spiffs", 10, "spiffs")) {
+      Serial.println("[HTTP] clearAllCookies 실패 - LittleFS 마운트되지 않음");
+      return;
+    }
   }
 
   String path = "/cookies/" + domain + ".json";
