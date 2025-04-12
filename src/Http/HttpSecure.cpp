@@ -410,12 +410,7 @@ void HttpSecure::readFrame() {
       }
       break;
     }
-
     case 0x8: {// Close Frame
-      if (_onMessage && payloadLen > 0) {
-        payload.push_back(0);
-        _onMessage(String((char*)payload.data()));
-      }
       if (_onDisconnected) _onDisconnected();
       end();  // 연결 종료
       break;
@@ -768,9 +763,9 @@ String HttpSecure::getCookieFilePath() {
 }
 
 void HttpSecure::processSetCookieHeader(const String& cookieHeader) {
+
   if (time(nullptr) < 24 * 3600) {
-    Serial.println("[HTTP] ❌ 시스템 시간이 아직 설정되지 않았습니다. NTP 동기화 필요!");
-    return;
+    log_w("시간정보가 잘못되어 쿠키만료일이 맞지 않을 수 있습니다!");
   }
 
   String name, value, domain, path = "/";
@@ -1096,8 +1091,7 @@ String HttpSecure::getCookie(const String& domain, const String& name) {
 
 void HttpSecure::setCookie(const String& domain, const String& name, const String& value, time_t expire) {
   if (time(nullptr) < 24 * 3600) {
-    Serial.println("[HTTP] ❌ 시스템 시간이 아직 설정되지 않았습니다. NTP 동기화 필요!");
-    return;
+    log_w("시간정보가 잘못되어 쿠키만료일이 맞지 않을 수 있습니다!");
   }
 
   if (!_littlefsInitialized) {

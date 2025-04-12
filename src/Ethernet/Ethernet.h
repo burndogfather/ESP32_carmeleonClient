@@ -74,6 +74,8 @@ public:
   bool setNTP(const char* ntpServer = "time.bora.net", 
   long gmtOffset_sec = 9 * 3600,  // KST (UTC+9)
   int daylightOffset_sec = 0);
+  char* getNTPServer();
+
   int hostByName(const char *hostname, IPAddress &result);
 
   virtual size_t printDriverInfo(Print &out) const;

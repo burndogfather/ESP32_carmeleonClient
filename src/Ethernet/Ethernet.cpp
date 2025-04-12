@@ -212,6 +212,10 @@ void EthernetClass::setHostname(const char* hostname) {
   }
 }
 
+char* EthernetClass::getNTPServer() {
+    return _ntpServer;
+}
+
 bool EthernetClass::setNTP(const char* ntpServer, long gmtOffset_sec, int daylightOffset_sec) {
   if (!linkUp()) {
     log_e("setNTP Error: Ethernet link is down");
