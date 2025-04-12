@@ -5,8 +5,10 @@
 #include <map>
 #include <vector>
 
+
 extern "C" {
   #include "lwip/sockets.h"
+  #include "mbedtls/esp_config.h"
   #include "mbedtls/ssl.h"
   #include "mbedtls/net_sockets.h"
   #include "mbedtls/entropy.h"
@@ -38,12 +40,20 @@ public:
   void debugCookiesystem();
 
 private:
+
+  bool _littlefsInitialized = false;
+  bool _littlefsSuccess = false;  // 초기화 성공 여부
+  TaskHandle_t _littlefsTask = NULL;
+  struct LittleFSTaskParams {
+    bool* pInitialized;
+    bool* pSuccess;
+  };
+
   bool _isSecure = false;
   String _host;
   String _path;
   uint16_t _port;
   std::map<String, String> _headers;
-  bool _littlefsInitialized = false;
 
   int _socket;
   mbedtls_ssl_context _ssl;
@@ -55,7 +65,8 @@ private:
   String _response;
   std::map<String, std::vector<String>> _responseHeaders;
 
-  void suppressLittleFSErrors();
+  static void littleFSTask(void* params);
+
   int _write(const uint8_t* buf, size_t len);
   int _read(uint8_t* buf, size_t len);
   void sendRequest(const String& method, const String& body = "", const String& contentType = "");

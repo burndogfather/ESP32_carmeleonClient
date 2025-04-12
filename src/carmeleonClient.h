@@ -6,7 +6,7 @@
 
 class carmeleonClient {
 public:
-  EthernetClass Ethernet;
+  EthernetClass Eth;
   HttpSecure Http;
 
   carmeleonClient();

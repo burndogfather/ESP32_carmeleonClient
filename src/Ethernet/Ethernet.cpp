@@ -24,7 +24,12 @@
 #include "esp_eth_mac.h"
 #include "esp_event.h"
 #include "esp_mac.h"
+#include "esp_system.h"
 #include "driver/gpio.h"
+
+#include <esp_netif.h>
+#include "lwip/netif.h"
+
 
 static uint8_t nextIndex = 0;
 
@@ -100,6 +105,8 @@ void EthernetClass::begin(uint8_t *mac, IPAddress localIP, IPAddress dnsIP, IPAd
   while (!linkUp() && ((millis() - start) < 3000)) {
     delay(10);
   }
+
+
 }
 
 int EthernetClass::begin(unsigned long timeout) {
@@ -117,6 +124,11 @@ int EthernetClass::maintain() {
 void EthernetClass::end() {
 
   //  Network.removeEvent(onEthConnected, ARDUINO_EVENT_ETH_CONNECTED);
+
+  if (_ntpServer) {
+    free(_ntpServer);
+    _ntpServer = nullptr;
+  }
 
   if (ethHandle != NULL) {
     if (esp_eth_stop(ethHandle) != ESP_OK) {
@@ -179,6 +191,55 @@ void EthernetClass::setDNS(IPAddress dns, IPAddress dns2) {
   if (dns2 != INADDR_NONE) {
     dnsIP(1, dns2);
   }
+}
+
+void EthernetClass::setHostname(const char* hostname) {
+
+  if (_pendingHostname) {
+    free(_pendingHostname);
+    _pendingHostname = nullptr;
+  }
+
+  if (hostname && strlen(hostname) > 0) {
+    _pendingHostname = strdup(hostname);
+    if (!_pendingHostname) {
+      log_e("Failed to allocate memory for hostname");
+    }
+  }
+
+  if (_esp_netif != nullptr) {
+      log_w("setHostname called after begin(). Hostname might not be effective until next connection/DHCP renewal.");
+  }
+}
+
+bool EthernetClass::setNTP(const char* ntpServer, long gmtOffset_sec, int daylightOffset_sec) {
+  if (!linkUp()) {
+    log_e("setNTP Error: Ethernet link is down");
+    return false;
+  }
+
+  // NTP 서버 설정
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+
+  // 기존 NTP 서버 메모리 해제
+  if (_ntpServer) {
+      free(_ntpServer);
+  }
+  _ntpServer = strdup(ntpServer);
+
+  // 시간 동기화 대기 (최대 10초)
+  time_t now = 0;
+  int retry = 0;
+  while ((now = time(nullptr)) < 24 * 3600 && retry++ < 10) {
+    delay(1000);
+  }
+
+  if (now < 24 * 3600) {
+    log_e("\nsetNTP Failed to synchronize time!");
+    return false;
+  }
+
+  return true;
 }
 
 int EthernetClass::hostByName(const char *hostname, IPAddress &result) {
@@ -267,6 +328,20 @@ bool EthernetClass::beginETH(uint8_t *macAddrP) {
     log_e("esp_netif_new failed");
     return false;
   }
+
+  if (_pendingHostname != nullptr) {
+    esp_err_t ret = esp_netif_set_hostname(_esp_netif, _pendingHostname);
+    if (ret != ESP_OK) {
+        log_e("esp_netif_set_hostname failed during init: 0x%X", ret);
+        return false;
+    }
+    // 설정 후 임시 저장된 호스트네임 메모리 해제
+    free(_pendingHostname);
+    _pendingHostname = nullptr;
+  }else{
+    esp_netif_set_hostname(_esp_netif, "carmeleon-client");
+  }
+
   // Attach Ethernet driver to TCP/IP stack
   glueHandle = esp_eth_new_netif_glue(ethHandle);
   if (glueHandle == NULL) {
@@ -292,6 +367,7 @@ bool EthernetClass::beginETH(uint8_t *macAddrP) {
     log_e("esp_eth_start failed: %d", ret);
     return false;
   }
+
 
 //  Network.onSysEvent(onEthConnected, ARDUINO_EVENT_ETH_CONNECTED);
 

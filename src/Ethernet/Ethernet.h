@@ -25,6 +25,8 @@
 #include "esp_netif.h"
 #include "utility/EthDriver.h"
 
+#include <time.h>
+
 enum EthernetLinkStatus {
   Unknown, LinkON, LinkOFF
 };
@@ -58,9 +60,13 @@ public:
   void MACAddress(uint8_t *mac);
   IPAddress dnsServerIP();
   void setDnsServerIP(const IPAddress dns);
+  void setHostname(const char* hostname);
 
   // API functions missing in NetworkInterface
   void setDNS(IPAddress dns, IPAddress dns2 = INADDR_NONE);
+  bool setNTP(const char* ntpServer = "time.bora.net", 
+    long gmtOffset_sec = 9 * 3600,  // KST (UTC+9)
+    int daylightOffset_sec = 0);
   int hostByName(const char *hostname, IPAddress &result);
 
   virtual size_t printDriverInfo(Print &out) const;
@@ -72,6 +78,10 @@ public:
   }
 
   uint8_t index = 0;
+
+private:
+  char* _pendingHostname = nullptr; // 호스트네임 임시 저장
+  char* _ntpServer = nullptr;
 
 protected:
   EthDriver* driver = nullptr;
