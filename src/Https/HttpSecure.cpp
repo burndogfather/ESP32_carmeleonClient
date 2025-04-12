@@ -33,25 +33,31 @@ void HttpSecure::littleFSTask(void* params) {
   
   // 마운트 시도
   if (!LittleFS.begin(false, "/spiffs", 10, "spiffs")) {
-    Serial.println("[HTTP] LittleFS 마운트 실패!");
-  }
+    Serial.println("[HTTP] LittleFS/cookies 마운트 실패! 저장소를 포맷합니다");
 
-  // 포맷 시도
-  if (LittleFS.format()) {
-    // 포맷 후 다시 마운트 시도
-    if (!LittleFS.begin(true, "/spiffs", 10, "spiffs")) {
-      Serial.println("[HTTP] LittleFS 포맷 후 마운트 실패!");
+    // 포맷 시도
+    if (LittleFS.format()) {
+      // 포맷 후 다시 마운트 시도
+      if (!LittleFS.begin(true, "/spiffs", 10, "spiffs")) {
+        Serial.println("[HTTP] LittleFS/cookies 포맷 후 마운트 실패!");
+        *(taskParams->pSuccess) = false;
+        vTaskDelete(NULL);
+        return;
+      }
+      Serial.println("[HTTP] 쿠키저장소(LittleFS) 초기화 완료 : ");
+    
+      // 파일 시스템 정보 출력
+      Serial.printf("  Total space: %d bytes\n", LittleFS.totalBytes());
+      Serial.printf("  Used space: %d bytes\n", LittleFS.usedBytes());
+
+    } else {
+      Serial.println("[HTTP] LittleFS/cookies 포맷 실패!");
       *(taskParams->pSuccess) = false;
       vTaskDelete(NULL);
       return;
     }
-  } else {
-    Serial.println("[HTTP] LittleFS 포맷 실패!");
-    *(taskParams->pSuccess) = false;
-    vTaskDelete(NULL);
-    return;
   }
-  
+
   // 디렉토리 생성 확인
   if (!LittleFS.open("/cookies", "r")) {
     if (!LittleFS.mkdir("/cookies")) {
@@ -62,11 +68,7 @@ void HttpSecure::littleFSTask(void* params) {
 
   *(taskParams->pInitialized) = true;
   *(taskParams->pSuccess) = true;
-  Serial.println("[HTTP] 쿠키저장소(LittleFS) 초기화 완료 : ");
-    
-  // 파일 시스템 정보 출력
-  Serial.printf("  Total space: %d bytes\n", LittleFS.totalBytes());
-  Serial.printf("  Used space: %d bytes\n", LittleFS.usedBytes());
+  
   vTaskDelete(NULL);
 }
 
@@ -468,6 +470,7 @@ void HttpSecure::readResponse() {
 
 
 String HttpSecure::getCookieFilePath() {
+
   // 디렉토리 경로 설정 (절대 경로 사용)
   String dir = "/cookies";
   
@@ -488,6 +491,11 @@ String HttpSecure::getCookieFilePath() {
 }
 
 void HttpSecure::processSetCookieHeader(const String& cookieHeader) {
+  if (time(nullptr) < 24 * 3600) {
+    Serial.println("[HTTP] ❌ 시스템 시간이 아직 설정되지 않았습니다. NTP 동기화 필요!");
+    return;
+  }
+
   String name, value, domain, path = "/";
   time_t expire = 0;
   bool secure = false;
@@ -541,7 +549,17 @@ void HttpSecure::processSetCookieHeader(const String& cookieHeader) {
 
 
 void HttpSecure::storeCookieToLittleFS(const String& name, const String& value, time_t expire) {
-  // 0. 시간대 강제 설정 (UTC 기준)
+  
+  if (time(nullptr) < 24 * 3600) {
+    Serial.println("[HTTP] ❌ 시스템 시간이 아직 설정되지 않아 쿠키 저장을 건너뜁니다.");
+    return;
+  }
+
+  if (!_littlefsInitialized) {
+    Serial.println("[HTTP] 오류! begin() 이후 사용이 가능합니다");
+    return;
+  }
+
   setenv("TZ", "UTC", 1); // 모든 시간을 UTC로 처리
   tzset();
 
@@ -745,9 +763,139 @@ void HttpSecure::clearAllCookies() {
   Serial.println("[HTTP] 모든 쿠키 삭제 완료");
 }
 
+String HttpSecure::getCookie(const String& domain, const String& name) {
+
+  if (!_littlefsInitialized) {
+    Serial.println("[HTTP] 오류! begin() 이후 사용이 가능합니다");
+    return "";
+  }
+
+  String path = "/cookies/" + domain + ".json";
+  path.replace(":", "_");
+
+  File file = LittleFS.open(path, "r");
+  if (!file) return "";
+
+  DynamicJsonDocument doc(2048);
+  DeserializationError err = deserializeJson(doc, file);
+  file.close();
+  if (err) return "";
+
+  JsonArray arr = doc.as<JsonArray>();
+  time_t now = time(nullptr);
+
+  for (JsonObject c : arr) {
+    if (!c.containsKey("name") || !c.containsKey("value") || !c.containsKey("expire")) continue;
+    if (String(c["name"].as<const char*>()) == name) {
+      time_t exp = c["expire"].as<time_t>();
+      if (exp == 0 || exp > now) {
+        return String(c["value"].as<const char*>());
+      }
+    }
+  }
+
+  return "";
+}
 
 
 
+void HttpSecure::setCookie(const String& domain, const String& name, const String& value, time_t expire) {
+  if (time(nullptr) < 24 * 3600) {
+    Serial.println("[HTTP] ❌ 시스템 시간이 아직 설정되지 않았습니다. NTP 동기화 필요!");
+    return;
+  }
+
+  if (!_littlefsInitialized) {
+    Serial.println("[HTTP] 오류! begin() 이후 사용이 가능합니다");
+    return;
+  }
+
+  if (expire == 0) expire = time(nullptr) + 86400 * 30; // 기본 유효기간: 30일
+
+  String path = "/cookies/" + domain + ".json";
+  path.replace(":", "_");
+
+  DynamicJsonDocument doc(4096);
+  JsonArray arr;
+
+  File file = LittleFS.open(path, "r");
+  if (file) {
+    DeserializationError err = deserializeJson(doc, file);
+    file.close();
+    if (err) doc.clear();
+  }
+
+  if (doc.isNull()) doc.to<JsonArray>();
+  arr = doc.as<JsonArray>();
+
+  bool updated = false;
+  for (JsonObject c : arr) {
+    if (String(c["name"].as<const char*>()) == name) {
+      c["value"] = value;
+      c["expire"] = expire;
+      updated = true;
+      break;
+    }
+  }
+
+  if (!updated) {
+    JsonObject c = arr.createNestedObject();
+    c["name"] = name;
+    c["value"] = value;
+    c["expire"] = expire;
+    c["domain"] = domain;
+    c["path"] = "/";
+  }
+
+  File save = LittleFS.open(path, "w");
+  if (save) {
+    serializeJson(doc, save);
+    save.close();
+  }
+}
+
+
+void HttpSecure::removeCookie(const String& domain, const String& name) {
+
+  if (!_littlefsInitialized) {
+    Serial.println("[HTTP] 오류! begin() 이후 사용이 가능합니다");
+    return;
+  }
+
+  String path = "/cookies/" + domain + ".json";
+  path.replace(":", "_");
+
+  File file = LittleFS.open(path, "r");
+  if (!file) return;
+
+  DynamicJsonDocument doc(4096);
+  DeserializationError err = deserializeJson(doc, file);
+  file.close();
+  if (err) return;
+
+  JsonArray arr = doc.as<JsonArray>();
+  bool changed = false;
+
+  for (int i = arr.size() - 1; i >= 0; --i) {
+    JsonObject c = arr[i];
+    if (c.containsKey("name") && String(c["name"].as<const char*>()) == name) {
+      arr.remove(i);
+      changed = true;
+      break;
+    }
+  }
+
+  if (changed) {
+    File save = LittleFS.open(path, "w");
+    if (save) {
+      serializeJson(doc, save);
+      save.close();
+      Serial.printf("[HTTP] 쿠키 삭제됨: %s (%s)\n", domain.c_str(), name.c_str());
+    } else {
+      Serial.printf("[HTTP] 쿠키파일 쓰기 실패 (경로: %s)\n", path.c_str());
+    }
+  }
+}
 
 
 

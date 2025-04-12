@@ -374,19 +374,49 @@ bool EthernetClass::beginETH(uint8_t *macAddrP) {
   return true;
 }
 
+void EthernetClass::onGotIP(std::function<void()> cb) {
+  _onGotIP = cb;
+}
+
+void EthernetClass::onConnected(std::function<void()> cb) {
+  _connectedCallback = cb;
+}
+
+void EthernetClass::onDisconnected(std::function<void()> cb) {
+  _disconnectedCallback = cb;
+}
+
+
 void EthernetClass::_onEthEvent(int32_t eventId, void *eventData) {
   arduino_event_t arduino_event;
   arduino_event.event_id = ARDUINO_EVENT_MAX;
+
+  if (eventId == ETHERNET_EVENT_CONNECTED || eventId == ETHERNET_EVENT_START) {
+    // 연결되었다고 해도 IP가 아직일 수 있으므로 주기적으로 확인
+    xTaskCreate([](void* param) {
+      EthernetClass* self = static_cast<EthernetClass*>(param);
+      for (int i = 0; i < 50; ++i) { // 최대 5초 대기
+        if (self->localIP() != INADDR_NONE) {
+          if (self->_onGotIP) self->_onGotIP();
+          break;
+        }
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+      }
+      vTaskDelete(NULL);
+    }, "onGotIP", 2048, this, 1, NULL);
+  }
 
   if (eventId == ETHERNET_EVENT_CONNECTED) {
     log_v("%s Connected", desc());
     arduino_event.event_id = ARDUINO_EVENT_ETH_CONNECTED;
     arduino_event.event_info.eth_connected = ethHandle;
     setStatusBits(ESP_NETIF_CONNECTED_BIT);
+    _connectedCallback();
   } else if (eventId == ETHERNET_EVENT_DISCONNECTED) {
     log_v("%s Disconnected", desc());
     arduino_event.event_id = ARDUINO_EVENT_ETH_DISCONNECTED;
     clearStatusBits(ESP_NETIF_CONNECTED_BIT | ESP_NETIF_HAS_IP_BIT | ESP_NETIF_HAS_LOCAL_IP6_BIT | ESP_NETIF_HAS_GLOBAL_IP6_BIT);
+    _disconnectedCallback();
   } else if (eventId == ETHERNET_EVENT_START) {
     log_v("%s Started", desc());
     arduino_event.event_id = ARDUINO_EVENT_ETH_START;

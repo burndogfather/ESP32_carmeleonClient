@@ -26,6 +26,7 @@
 #include "utility/EthDriver.h"
 
 #include <time.h>
+#include <functional>
 
 enum EthernetLinkStatus {
   Unknown, LinkON, LinkOFF
@@ -49,6 +50,12 @@ public:
   int begin(unsigned long timeout = 60000);
   void begin(IPAddress ip, IPAddress dns = INADDR_NONE, IPAddress gateway = INADDR_NONE, IPAddress subnet = INADDR_NONE);
 
+  void _onEthEvent(int32_t eventId, void *eventData);
+  
+  void onGotIP(std::function<void()> cb);
+  void onConnected(std::function<void()> cb);
+  void onDisconnected(std::function<void()> cb);
+
   void end();
   int maintain();
 
@@ -65,13 +72,13 @@ public:
   // API functions missing in NetworkInterface
   void setDNS(IPAddress dns, IPAddress dns2 = INADDR_NONE);
   bool setNTP(const char* ntpServer = "time.bora.net", 
-    long gmtOffset_sec = 9 * 3600,  // KST (UTC+9)
-    int daylightOffset_sec = 0);
+  long gmtOffset_sec = 9 * 3600,  // KST (UTC+9)
+  int daylightOffset_sec = 0);
   int hostByName(const char *hostname, IPAddress &result);
 
   virtual size_t printDriverInfo(Print &out) const;
 
-  void _onEthEvent(int32_t eventId, void *eventData);
+  
 
   esp_eth_handle_t getEthHandle() {
     return ethHandle;
@@ -82,6 +89,9 @@ public:
 private:
   char* _pendingHostname = nullptr; // 호스트네임 임시 저장
   char* _ntpServer = nullptr;
+  std::function<void()> _onGotIP = nullptr;
+  std::function<void()> _connectedCallback = nullptr;
+  std::function<void()> _disconnectedCallback = nullptr;
 
 protected:
   EthDriver* driver = nullptr;
@@ -91,6 +101,7 @@ protected:
 
   EthernetHardwareStatus hwStatus = EthernetNoHardware;
 
+  
   bool beginETH(uint8_t *mac);
 };
 

@@ -35,8 +35,12 @@ public:
   int statusCode();
   void printAllCookies();
   void clearAllCookies();
-  void end();
 
+  String getCookie(const String& domain, const String& name);
+  void setCookie(const String& domain, const String& name, const String& value, time_t expire = 0);
+  void removeCookie(const String& domain, const String& name);
+
+  void end();
   void debugCookiesystem();
 
 private:
