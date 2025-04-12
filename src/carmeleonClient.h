@@ -2,7 +2,7 @@
 #define CARMELEON_CLIENT_H
 
 #include <Ethernet/EthernetESP32.h>
-#include <Https/HttpSecure.h>
+#include <Http/HttpSecure.h>
 
 class carmeleonClient {
 public:
