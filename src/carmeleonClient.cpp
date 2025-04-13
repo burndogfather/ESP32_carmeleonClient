@@ -1,5 +1,6 @@
 #include "carmeleonClient.h"
 
+
 static void ethernetMaintainTask(void* pvParameters) {
   while (true) {
     Ethernet.maintain();
@@ -20,21 +21,3 @@ carmeleonClient::carmeleonClient() {
 }
 
 
-bool carmeleonClient::connectToServer(const char* host, uint16_t port) {
-  IPAddress ip;
-  if (!Ethernet.hostByName(host, ip)) {
-    Serial.println("DNS 실패");
-    return false;
-  }
-
-  EthernetClient client;
-  if (!client.connect(ip, port)) {
-    Serial.println("서버 연결 실패");
-    return false;
-  }
-
-  Serial.println("서버 연결 성공");
-  client.stop();
-  return true;
-
-}

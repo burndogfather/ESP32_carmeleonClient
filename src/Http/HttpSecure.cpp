@@ -1,11 +1,11 @@
 #define USE_LITTLEFS
 #include "HttpSecure.h"
-#include <Ethernet/EthernetESP32.h>
+#include "Ethernet/EthernetESP32.h"
 
 #include <FS.h>
 #include <LittleFS.h> 
 
-#include <ArduinoJson/ArduinoJson.h>
+#include "ArduinoJson/ArduinoJson.h"
 #include <map>
 #include <vector>
 
@@ -16,9 +16,9 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <LittleFS.h>
-#include "esp_log.h"
+#include <esp_log.h>
 
-#include "mbedtls/base64.h"
+#include <mbedtls/base64.h>
 
 HttpSecure::HttpSecure() {
   
@@ -77,14 +77,49 @@ void HttpSecure::littleFSTask(void* params) {
 
 void HttpSecure::websocketRecvTask(void* arg) {
   HttpSecure* self = static_cast<HttpSecure*>(arg);
+
   while (self->_connected) {
-    self->readFrame();  // 프레임 읽기
-    vTaskDelay(10 / portTICK_PERIOD_MS);  // 약간의 휴식
+    self->readFrame();
+    vTaskDelay(10 / portTICK_PERIOD_MS);
   }
+
+  // 중복 호출 방지
+  if (self->_isWebSocket) {
+    self->_isWebSocket = false;
+
+    if (self->_isSecure) {
+      mbedtls_ssl_close_notify(&self->_ssl);
+      mbedtls_ssl_free(&self->_ssl);
+      mbedtls_ssl_config_free(&self->_conf);
+      mbedtls_ctr_drbg_free(&self->_ctr_drbg);
+    }
+
+    close(self->_socket);
+    self->_socket = -1;
+
+    if (self->_onDisconnected) {
+      self->_onDisconnected();  // 👉 여기서 한 번만 호출
+    }
+  }
+
+  self->_wsRecvTask = nullptr;
+
+  if (self->_keepAlive && !self->_lastWsUrl.isEmpty()) {
+    Serial.println("[HTTP] KeepAlive: 연결 끊김 감지 → 재연결 시도");
+    while (!self->handshake(self->_lastWsUrl.c_str())) {
+      Serial.println("[HTTP] KeepAlive: 재연결 실패 → 재시도");
+      delay(1000);  // 1초 간격 재시도
+    }
+  }
+
+
   vTaskDelete(NULL);
 }
 
+
+
 bool HttpSecure::begin(const char* fullUrl) {
+
 
   // 기존 연결 및 SSL 상태 정리
   end();  
@@ -230,18 +265,23 @@ bool HttpSecure::begin(const char* fullUrl) {
     delay(10); // 또는 vTaskDelay()
   }
 
-  if (!_littlefsSuccess) {
-    Serial.println("[HTTP] LittleFS 초기화 실패!");
-    return false;
+
+  if (_onConnected) {
+    _onConnected();
   }
   
   _connected = true;
   return true;
 }
 
+void HttpSecure::KeepAlive(bool enabled) {
+  _keepAlive = enabled;
+}
 
 bool HttpSecure::handshake(const char* wsUrl) {
   if (!begin(wsUrl)) return false;
+
+  _lastWsUrl = wsUrl;
 
   _isWebSocket = true;
   uint8_t randomKey[16];
@@ -261,8 +301,8 @@ bool HttpSecure::handshake(const char* wsUrl) {
   int status = get();
   if (status == 101) {
     _connected = true;
-    if (_onConnected) {
-      _onConnected();
+    if (_onHandshake) {
+      _onHandshake();
     }
 
     if (_wsRecvTask == nullptr) {
@@ -343,7 +383,7 @@ void HttpSecure::readFrame() {
   uint8_t hdr[2];
   int hdrLen = _read(hdr, 2);
   if (hdrLen <= 0) {
-    if (_onDisconnected) _onDisconnected();
+    Serial.println("[HTTP] 헤더 수신 실패");
     end();
     return;
   }
@@ -352,7 +392,7 @@ void HttpSecure::readFrame() {
   bool isMasked = hdr[1] & 0x80;
   uint64_t payloadLen = hdr[1] & 0x7F;
 
-  // 확장 payload 길이 처리
+  // 확장 길이 처리
   if (payloadLen == 126) {
     uint8_t ext[2];
     if (_read(ext, 2) != 2) { end(); return; }
@@ -361,11 +401,13 @@ void HttpSecure::readFrame() {
     uint8_t ext[8];
     if (_read(ext, 8) != 8) { end(); return; }
     payloadLen = 0;
-    for (int i = 0; i < 4; ++i) payloadLen = (payloadLen << 8) | ext[i + 4];
+    for (int i = 0; i < 8; ++i) {
+      payloadLen = (payloadLen << 8) | ext[i];
+    }
   }
 
   if (payloadLen > 4096) {
-    Serial.println("[HTTP] WS Payload too large");
+    Serial.printf("[HTTP] payload too large: %llu bytes\n", payloadLen);
     end();
     return;
   }
@@ -379,55 +421,58 @@ void HttpSecure::readFrame() {
   size_t totalRead = 0;
   while (totalRead < payloadLen) {
     int r = _read(payload.data() + totalRead, payloadLen - totalRead);
-    if (r <= 0) { end(); return; }
+    if (r <= 0) {
+      Serial.printf("[HTTP] payload 수신 중단됨 (%zu / %llu)\n", totalRead, payloadLen);
+      break; // 👉 읽은 만큼 처리 후 종료
+    }
     totalRead += r;
   }
 
+  // 마스크 해제
   if (isMasked) {
-    for (size_t i = 0; i < payloadLen; ++i) {
+    for (size_t i = 0; i < totalRead; ++i) {
       payload[i] ^= mask[i % 4];
     }
   }
 
+  // 메시지 처리
+  if (totalRead > 0) {
+    switch (opcode) {
+      case 0x1: {  // Text
+        payload.push_back(0);  // Null-terminate
+        String msg = String((char*)payload.data());
+        if (_onMessage) _onMessage(msg);
 
-  switch (opcode) {
-    case 0x1: {// Text Frame
-      payload.push_back(0);  // null-terminate
-      String msg = String((char*)payload.data());
-      if (_onMessage) _onMessage(msg);
-    
-      // 🔁 "ping" (대소문자 무시) → "pong" 문자열로 응답
-      msg.toLowerCase();
-      if (msg == "ping") {
-        sendMsgString("pong");
+        msg.toLowerCase();
+        if (msg == "ping") {
+          sendMsgString("pong");
+        }
+        break;
       }
-      break;
-    }
-
-    case 0x2: { // Binary Frame
-      if (_onMessageBinary) {
-        _onMessageBinary(payload);  // 바이너리 콜백 호출
+      case 0x2: {  // Binary
+        if (_onMessageBinary) _onMessageBinary(payload);
+        break;
       }
-      break;
-    }
-    case 0x8: {// Close Frame
-      if (_onDisconnected) _onDisconnected();
-      end();  // 연결 종료
-      break;
-    }
-    case 0x9: {// Ping → Pong 응답
-      sendPong(payload);
-      break;
-    }
-    case 0xA: {// Pong (무시 가능)
-      break;
-    }
-    default:{
-      Serial.printf("[HTTP] 알 수 없는 WS opcode: 0x%02X\n", opcode);
-      break;
+      case 0x8: {
+        _connected = false;  // 직접 end() 호출 X. 수신 태스크에서 정리하게 둔다.
+        break;
+      }
+      case 0x9: {  // Ping
+        sendPong(payload);
+        break;
+      }
+      case 0xA: {  // Pong
+        break;
+      }
+      default: {
+        Serial.printf("[HTTP] 알 수 없는 opcode: 0x%02X\n", opcode);
+        break;
+      }
     }
   }
+
 }
+
 
 void HttpSecure::sendPong(const std::vector<uint8_t>& payload) {
   if (!_connected) return;
@@ -456,10 +501,12 @@ void HttpSecure::sendPong(const std::vector<uint8_t>& payload) {
 
 
 
-
-
 void HttpSecure::onConnected(std::function<void()> cb) {
   _onConnected = cb;
+}
+
+void HttpSecure::onHandshake(std::function<void()> cb) {
+  _onHandshake = cb;
 }
 
 void HttpSecure::onDisconnected(std::function<void()> cb) {
@@ -565,28 +612,43 @@ int HttpSecure::statusCode() {
 }
 
 void HttpSecure::end() {
-  bool wasConnected = _connected;
+  if (!_connected) return;
+  _connected = false;  // 연결 끊기 플래그만 설정 (실제 정리는 websocketRecvTask에서 처리)
+  _keepAlive = false;  //keepAlive는 먹히지 않음
 
-  if (_connected) {
+  if (_isWebSocket) {
+    // WebSocket close 프레임 전송
+    uint8_t closeFrame[2] = { 0x88, 0x00 }; // FIN + opcode=8 (Close)
+    _write(closeFrame, 2);
+    delay(20); // 서버에 close 전달 대기
+
+  }else{
+
     if (_isSecure) {
       mbedtls_ssl_close_notify(&_ssl);
       mbedtls_ssl_free(&_ssl);
       mbedtls_ssl_config_free(&_conf);
       mbedtls_ctr_drbg_free(&_ctr_drbg);
     }
-
-    if (_wsRecvTask) {
-      TaskHandle_t tmp = _wsRecvTask;
+  
+    if (_socket != -1) {
+      close(_socket);
+      _socket = -1;
+    }
+  
+    if (_wsRecvTask != nullptr) {
+      vTaskDelete(_wsRecvTask);
       _wsRecvTask = nullptr;
-      vTaskDelete(tmp);
+    }
+  
+    if (_onDisconnected) {
+      _onDisconnected();
     }
 
-    close(_socket);
-    _connected = false;
-    _isWebSocket = false;
-    if (wasConnected && _onDisconnected) _onDisconnected();
   }
+
 }
+
 
 int HttpSecure::_write(const uint8_t* buf, size_t len) {
   if (_isSecure) {

@@ -7,13 +7,13 @@
 
 
 extern "C" {
-  #include "lwip/sockets.h"
-  #include "mbedtls/esp_config.h"
-  #include "mbedtls/ssl.h"
-  #include "mbedtls/net_sockets.h"
-  #include "mbedtls/entropy.h"
-  #include "mbedtls/ctr_drbg.h"
-  #include "mbedtls/error.h"
+  #include <lwip/sockets.h>
+  #include <mbedtls/esp_config.h>
+  #include <mbedtls/ssl.h>
+  #include <mbedtls/net_sockets.h>
+  #include <mbedtls/entropy.h>
+  #include <mbedtls/ctr_drbg.h>
+  #include <mbedtls/error.h>
 }
 
 
@@ -21,15 +21,17 @@ class HttpSecure {
 public:
   HttpSecure();
 
+  void KeepAlive(bool enabled);
   bool handshake(const char* wsUrl);
   void sendMsgString(const String& message);
   void sendMsgBinary(const std::vector<uint8_t>& data);
   void onConnected(std::function<void()> cb);
+  void onHandshake(std::function<void()> cb);
   void onDisconnected(std::function<void()> cb);
   void onMsgString(std::function<void(String)> cb);
   void onMsgBinary(std::function<void(std::vector<uint8_t>)> cb); 
 
-  bool begin(const char* fullUrl);  // 예: https://host:port/path
+  bool begin(const char* url);  // 예: https://host:port/path
   void requestHeader(const String& name, const String& value);
   String responseHeader(const String& name);
   void printAllResponseHeaders();
@@ -53,12 +55,15 @@ public:
 
 private:
 
+  bool _keepAlive = false;
+  String _lastWsUrl = "";
+
   bool _isWebSocket = false;
   bool _littlefsInitialized = false;
   bool _littlefsSuccess = false;  // 초기화 성공 여부
 
   TaskHandle_t _wsRecvTask = nullptr;
-  TaskHandle_t _littlefsTask = NULL;
+  TaskHandle_t _littlefsTask = nullptr;
 
   struct LittleFSTaskParams {
     bool* pInitialized;
@@ -82,6 +87,7 @@ private:
   std::map<String, std::vector<String>> _responseHeaders;
 
   std::function<void()> _onConnected;
+  std::function<void()> _onHandshake;
   std::function<void()> _onDisconnected;
   std::function<void(String)> _onMessage; // 텍스트 메시지
   std::function<void(std::vector<uint8_t>)> _onMessageBinary;  // 바이너리 메시지
