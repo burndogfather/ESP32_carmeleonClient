@@ -19,7 +19,8 @@ carmeleonClient 클래스의 주요특징 :
 서버환경 : Carmeleon Framework v3.0.0 (DADOL corp) 
  
 (Carmeleon Framework API연동 및 WSS통신 대응목적으로 개발된 라이브러리입니다) 
-(Carmeleon Framework가 아닌 통신은 examples의 lowlevel을 활용할 수 있습니다) 
+ 
+(Carmeleon Framework가 아닌 HTTP 통신은 examples의 lowlevel을 활용할 수 있습니다) 
  
 ========================== 
 
@@ -446,3 +447,9 @@ void loop() {
 }
 
 ```
+
+
+========================== 
+
+### 주의사항  
+[여기](https://github.com/burndogfather/ESP32_carmeleonClient/tree/master/examples)에서 각 기능별로 사용예제를 확인할 수 있습니다. 
