@@ -19,6 +19,7 @@ carmeleonClient 클래스의 주요특징 :
 서버환경 : Carmeleon Framework v3.0.0 (DADOL corp) 
  
 (Carmeleon Framework API연동 및 WSS통신 대응목적으로 개발된 라이브러리입니다) 
+(Carmeleon Framework가 아닌 통신은 examples의 lowlevel을 활용할 수 있습니다) 
  
 ========================== 
 
@@ -191,7 +192,7 @@ void setup() {
   WSEvent& evt = carmeleon.ws(
 	"wss://도메인/ws/689d2efc-2b88-494d-a5f6-a9d892b2f859",
 	{ //Header 커스텀데이터
-	  {"User-Agent", "FCO-OP-C-001"},
+	  {"User-Agent", "유저에이전트"},
 	  {"Firmware-version", "0.1"},
 	  {"Macaddress", carmeleon.Eth.MACAddressString()},
 	  {"Localip", carmeleon.Eth.localIPString()}
@@ -398,7 +399,7 @@ void setup() {
   //연결을 계속 유지
   carmeleon.Http.KeepAlive(true);
 
-  carmeleon.Http.requestHeader("User-Agent", "FCO-OP-C-001");
+  carmeleon.Http.requestHeader("User-Agent", "유저에이전트");
   carmeleon.Http.requestHeader("Firmware-version", "0.1");
 
   if (carmeleon.Http.handshake()) {
