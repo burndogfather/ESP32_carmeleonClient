@@ -53,14 +53,27 @@ extra_scripts =
  
 ========================== 
  
-Method 목록 
+이더넷관련 Method 목록 
 - carmeleonClient.Eth.init(EthDriver& ethDriver)
 - carmeleonClient.Eth.begin(uint8_t *mac)
-- Lowlevel수준의 TLS 또는 SSL 기반의 웹 또는 웹소켓 연결지원
-- Json, Messagepack등 다양한 직렬화 기능 포함
-- Cookie 및 Redirect처리등 브라우저의 기본 기능 내재화
-- OTA업데이트 지원
-- 기타 각종 독립적 이벤트처리
+- carmeleonClient.Eth.MACAddress(uint8_t *mac)
+- carmeleonClient.Eth.MACAddressString()
+- carmeleonClient.Eth.localIPString()
+- carmeleonClient.Eth.dnsServerIP()
+- carmeleonClient.Eth.setDnsServerIP(const IPAddress dns)
+- carmeleonClient.Eth.setHostname(const char* hostname)
+- carmeleonClient.Eth.setDNS(IPAddress dns)
+- carmeleonClient.Eth.setNTP(const char* ntpServer)
+- carmeleonClient.Eth.getNTPServer()
+- carmeleonClient.Eth.hostByName(const char *hostname, IPAddress &result)
+- carmeleonClient.Eth.onGotIP(std::function<void()> cb)
+- carmeleonClient.Eth.onConnected(std::function<void()> cb)
+- carmeleonClient.Eth.onDisconnected(std::function<void()> cb)
+- carmeleonClient.Eth.printDriverInfo(Print &out)
+- carmeleonClient.Eth.linkStatus()
+- carmeleonClient.Eth.hardwareStatus()
+- carmeleonClient.Eth.end()
+
  
 ========================== 
 
