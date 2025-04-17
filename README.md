@@ -1,5 +1,7 @@
 ESP32 Carmeleon Client
 ================
+ 
+![CARMELEON_LOGO](https://github.com/user-attachments/assets/05fdd5aa-0143-4a42-b6f8-da04ebcada1c)
 
 ESP32 Carmeleon Client는 Carmeleon서버와 AES암호화통신을 활용한 API요청이나 스트림기반의 소켓통신을 ESP32에서 손쉽게 구현하기 위한 통합 라이브러리입니다. 
 
