@@ -452,4 +452,15 @@ void loop() {
 ========================== 
 
 ### 주의사항  
-[여기](https://github.com/burndogfather/ESP32_carmeleonClient/tree/master/examples)에서 각 기능별로 사용예제를 확인할 수 있습니다. 
+ESP32의 SSL/TLS 통신을 위해서는 Espressif가 제공하는 "mbedtls_*" 내장함수를 사용하는데, 이 함수는 Thread-Safe하지 않으며, Read과정에서 Write할 수 없습니다. 
+ 
+따라서 일반적인 POST/GET/PUT/DELETE 통신뿐만 아니라 Websocket 통신에서의 이벤트내부에 다른 통신을 중첩하여 사용할 수 없고, 반드시 "end()" 메소드를 호출시킨 뒤 처리해야 합니다. 
+ 
+라이브러리 내부적으로는 각각의 객체가 독립적인 내부값을 다루고 있으나, 위와 같은 이슈로 인해 오류가 발생될 수 있음으로 이벤트내 중첩 요청은 사용해선 안됩니다. 
+```c++
+WSEvent& evt = carmeleon.ws("wss://도메인2");
+evt.onDisconnected([](){
+  //❌절대로 사용하면 안됨
+  carmeleon.Http.begin("https://도메인1");
+});
+```
