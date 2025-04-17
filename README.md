@@ -19,7 +19,6 @@ carmeleonClient 클래스의 주요특징 :
 서버환경 : Carmeleon Framework v3.0.0 (DADOL corp) 
  
 (Carmeleon Framework API연동 및 WSS통신 대응목적으로 개발된 라이브러리입니다) 
- 
 (Carmeleon Framework가 아닌 HTTP 통신은 examples의 lowlevel을 활용할 수 있습니다) 
  
 ========================== 
@@ -51,6 +50,17 @@ extra_scripts =
 	#pre:erase_flash.py # OTA이후 파티션이 정리되지 않아 쓰기를 못하면 이것을 활성화하면 업로드직전에 포맷한다
 	./littlefsbuilder.py
 ```
+ 
+========================== 
+ 
+Method 목록 
+- carmeleonClient.Eth.init(EthDriver& ethDriver)
+- carmeleonClient.Eth.begin(uint8_t *mac)
+- Lowlevel수준의 TLS 또는 SSL 기반의 웹 또는 웹소켓 연결지원
+- Json, Messagepack등 다양한 직렬화 기능 포함
+- Cookie 및 Redirect처리등 브라우저의 기본 기능 내재화
+- OTA업데이트 지원
+- 기타 각종 독립적 이벤트처리
  
 ========================== 
 
