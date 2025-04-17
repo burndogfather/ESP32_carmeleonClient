@@ -76,30 +76,30 @@ extra_scripts =
  
  
 API관련 Method 목록 
-- Response carmeleonClient.api(const String& url, std::initializer_list<std::pair<const char*, JsonVariantWrapper>> params = {})
-- Response->prettyPrint() 
-- Response->json
-- Response->json.containsKey("key")
-- Response->["key"]
-- Response->["key"][i]
-- Response->["key"].is<T>()
-- Response->["key"].as<T>()
+- Response res = carmeleonClient.api(const String& url, std::initializer_list<std::pair<const char*, JsonVariantWrapper>> params = {})
+- res.prettyPrint() 
+- res.json
+- res.json.containsKey("key")
+- res.["key"]
+- res.["key"][i]
+- res.["key"].is<T>()
+- res.["key"].as<T>()
  
  
 WS관련 Method 목록 
-- WSEvent& carmeleonClient.ws(const String& url, const std::map<String,String>& headers)
-- WSEvent->start()
-- WSEvent->KeepAlive(bool enable)
-- WSEvent->onConnected(std::function<void()> cb)
-- WSEvent->onDisconnected(std::function<void()> cb)
-- WSEvent->onReceiveString(std::function<void(String)> cb)
-- WSEvent->onReceive(std::function<void(Response)> cb)
-- WSEvent->onSend(std::function<void(String)> cb)
-- WSEvent->send(const String& msg)
-- WSEvent->send(const std::vector<uint8_t>& binaryData)
-- WSEvent->send(JsonDocument& doc)
-- WSEvent->send(std::initializer_list<std::pair<const char*, JsonVariantWrapper>> kv)
-- WSEvent->end()
+- WSEvent& evt = carmeleonClient.ws(const String& url, const std::map<String,String>& headers)
+- evt.start()
+- evt.KeepAlive(bool enable)
+- evt.onConnected(std::function<void()> cb)
+- evt.onDisconnected(std::function<void()> cb)
+- evt.onReceiveString(std::function<void(String)> cb)
+- evt.onReceive(std::function<void(Response)> cb)
+- evt.onSend(std::function<void(String)> cb)
+- evt.send(const String& msg)
+- evt.send(const std::vector<uint8_t>& binaryData)
+- evt.send(JsonDocument& doc)
+- evt.send(std::initializer_list<std::pair<const char*, JsonVariantWrapper>> kv)
+- evt.end()
  
  
 LowLevel HTTP Method 목록 
