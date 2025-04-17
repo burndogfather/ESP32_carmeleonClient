@@ -147,7 +147,7 @@ void setup() {
 
   Serial.println("======프레임워크 기반 API통신======");
   Response res = carmeleon.api(
-	"https://test.codi.farm/api/washnow/area_select", 
+	"https://도메인/api/washnow/area_select", 
 	{  //FORM 전송 데이터
 	  {"page", "1"},
 	  {"pagging", "50"},
@@ -189,7 +189,7 @@ void setup() {
   Serial.println("======프레임워크 기반 WS통신======");
   carmeleon.Http.clearAllCookies();
   WSEvent& evt = carmeleon.ws(
-	"wss://codi.farm/ws/689d2efc-2b88-494d-a5f6-a9d892b2f859",
+	"wss://도메인/ws/689d2efc-2b88-494d-a5f6-a9d892b2f859",
 	{ //Header 커스텀데이터
 	  {"User-Agent", "FCO-OP-C-001"},
 	  {"Firmware-version", "0.1"},
@@ -305,7 +305,7 @@ void setup() {
  
 
   Serial.println("======HTTPS 쿠키처리 테스트======");
-  if (carmeleon.Http.begin("https://codi.farm/home")) {
+  if (carmeleon.Http.begin("https://도메인/경로")) {
 	carmeleon.Http.requestHeader("User-Agent", "carmeleon/1.0");
 	int status = carmeleon.Http.get();
 	Serial.print("응답 코드: ");
@@ -325,14 +325,14 @@ void setup() {
 
   carmeleon.Http.printAllCookies();
   Serial.print("토큰값: ");
-  Serial.println(carmeleon.Http.getCookie("codi.farm", "_TOKEN_"));
+  Serial.println(carmeleon.Http.getCookie("도메인", "_TOKEN_"));
 
   
 
   Serial.println("======쿠키 변경 테스트======");
-  carmeleon.Http.setCookie("codi.farm", "_TOKEN_", "test");
+  carmeleon.Http.setCookie("도메인", "_TOKEN_", "test");
   Serial.print("변경후 토큰값: ");
-  Serial.println(carmeleon.Http.getCookie("codi.farm", "_TOKEN_"));
+  Serial.println(carmeleon.Http.getCookie("도메인", "_TOKEN_"));
   carmeleon.Http.printAllCookies();
   
  
@@ -343,9 +343,9 @@ void setup() {
 	Serial.println("❌ 수신받음!");
   });
   Serial.println("======리다이렉트 테스트======");
-  if (carmeleon.Http.begin("http://codi.farm")) {
-	carmeleon.Http.setCookie("codi.farm", "_TOKEN_", "test");
-	carmeleon.Http.removeCookie("codi.farm", "_TOKEN_");
+  if (carmeleon.Http.begin("http://도메인")) {
+	carmeleon.Http.setCookie("도메인", "_TOKEN_", "test");
+	carmeleon.Http.removeCookie("도메인", "_TOKEN_");
 	carmeleon.Http.requestHeader("User-Agent", "carmeleon/1.0");
 	int status = carmeleon.Http.get();
 	Serial.print("응답 코드: ");
@@ -359,7 +359,7 @@ void setup() {
   
   
   Serial.println("======웹소켓 테스트======");
-  if(carmeleon.Http.begin("wss://codi.farm/ws/test")){
+  if(carmeleon.Http.begin("wss://도메인/ws/test")){
 	Serial.println("웹소켓 준비 됨");
   }else{
 	Serial.println("웹소켓 준비 실패");
@@ -432,7 +432,7 @@ void setup() {
   carmeleon.Ota.onFail([](String msg) {
 	Serial.println("OTA실패 : "+msg);
   });
-  if(carmeleon.Ota.begin("https://test.codi.farm/esp32_blink_firmware.bin")){
+  if(carmeleon.Ota.begin("https://도메인/esp32_blink_firmware.bin")){
 	Serial.println("OTA완료!");
   }else{
 	Serial.println("OTA업데이트 실패");

@@ -53,7 +53,7 @@ void setup() {
 
 void loop(){
     Response res = carmeleon.api(
-        "https://www.thecarmeleon.com/api/washnow/area_select", 
+        "https://도메인/api/washnow/area_select", 
         {  //FORM 전송 데이터
             {"page", "1"},
             {"pagging", "50"},
