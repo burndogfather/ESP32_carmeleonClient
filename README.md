@@ -22,7 +22,7 @@ carmeleonClient 클래스의 주요특징 :
 
 ### 중요사항 
 PlatformIO 프로젝트 폴더 내부에 "platformio.ini" 파일을 아래와 같이 수정해주시길 바랍니다. 
-"erase_flash.py", "littlefsbuilder.py" 소스코드는 [여기에](https://github.com/burndogfather/ESP32_carmeleonClient/tree/master/PlatformIO) 
+"erase_flash.py", "littlefsbuilder.py", "partitions.csv" 소스코드는 [여기에](https://github.com/burndogfather/ESP32_carmeleonClient/tree/master/PlatformIO) 
 ```ini
 [env:esp32dev]
 platform = https://raw.githubusercontent.com/burndogfather/ESP32_carmeleonClient/refs/heads/master/platform-espressif32_v54.03.20.zip
