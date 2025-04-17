@@ -38,16 +38,16 @@ lib_deps =
 	https://github.com/burndogfather/ESP32_carmeleonClient.git
 
 board_build.flash_mode = qio
-board_build.f_cpu = 240000000L # CPU클럭 (240Mhz)
-board_build.f_flash = 80000000L  # 플래시 클럭 속도 증가 (80MHz)
-board_build.partitions = partitions.csv #파티션 지정파일
-board_build.flash_size = 4MB
+board_build.f_cpu = 240000000L # CPU의 최대클럭 (240Mhz)
+board_build.f_flash = 80000000L  # 플래시 최대클럭 (80MHz)
+board_build.partitions = partitions.csv #플래시내 파티션 지정파일
+board_build.flash_size = 4MB #플래시 용량
 board_build.filesystem = littlefs #쿠키를 저장하는 방식
 
 build_flags =  
 
 extra_scripts =
-	#pre:erase_flash.py # OTA이후 파티션이 정리되지 않아 쓰기를 못하면 이것을 활성화하면 업로드직전에 포맷한다
+	#pre:erase_flash.py # OTA이후 파티션이 정리되지 않아 쓰기를 못하면 이것을 활성화하면 업로드직전에 포맷한다 (partitions.csv기준)
 	./littlefsbuilder.py
 ```
  
