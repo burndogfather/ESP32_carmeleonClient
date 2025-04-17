@@ -20,7 +20,7 @@ carmeleonClient 클래스의 주요특징 :
  
 (Carmeleon Framework API연동 및 WSS통신 대응목적으로 개발된 라이브러리입니다) 
  
-================ 
+========================== 
 
 ### 중요사항 
 PlatformIO 프로젝트 폴더 내부에 "platformio.ini" 파일을 아래와 같이 수정해주시길 바랍니다. 
@@ -50,10 +50,10 @@ extra_scripts =
 	./littlefsbuilder.py
 ```
  
-================ 
+========================== 
 
 ### 사용예시 
-[여기에](https://github.com/burndogfather/ESP32_carmeleonClient/tree/master/examples)에서 각 기능별로 사용예제를 확인할 수 있습니다. 
+[여기](https://github.com/burndogfather/ESP32_carmeleonClient/tree/master/examples)에서 각 기능별로 사용예제를 확인할 수 있습니다. 
 ```c++
 #include <Arduino.h>
 #include <carmeleonClient.h>
