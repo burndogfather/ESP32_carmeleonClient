@@ -12,17 +12,18 @@ carmeleonClient 클래스의 주요특징 :
 - OTA업데이트 지원
 - 기타 각종 독립적 이벤트처리
 
-(Carmeleon Framework API연동 및 WSS통신 대응목적으로 개발된 라이브러리입니다) 
+
  
 테스트환경 : ESP32S Develop Module  
 개발환경 : PlatformIO  
 서버환경 : Carmeleon Framework v3.0.0 (DADOL corp) 
+(Carmeleon Framework API연동 및 WSS통신 대응목적으로 개발된 라이브러리입니다) 
  
- 
+
 ### 중요사항 
 PlatformIO 프로젝트 폴더 내부에 "platformio.ini" 파일을 아래와 같이 수정해주시길 바랍니다. 
 "erase_flash.py", "littlefsbuilder.py" 소스코드는 [여기에](https://github.com/burndogfather/ESP32_carmeleonClient/tree/master/PlatformIO) 
-```toml
+```ini
 [env:esp32dev]
 platform = https://raw.githubusercontent.com/burndogfather/ESP32_carmeleonClient/refs/heads/master/platform-espressif32_v54.03.20.zip
 framework = arduino
