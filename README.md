@@ -133,6 +133,14 @@ LowLevel HTTP Method 목록
 - carmeleonClient.Http.onMsgBinary(std::function<void(std::vector<uint8_t>)> cb)
 - carmeleonClient.Http.end()
  
+ 
+OTA Method 목록 
+- carmeleonClient.Ota.begin(const char* url)
+- carmeleonClient.Ota.onConnected(std::function<void()> cb)
+- carmeleonClient.Ota.onWriting(std::function<void()> cb)
+- carmeleonClient.Ota.onSuccess(std::function<void()> cb)
+- carmeleonClient.Ota.onFail(std::function<void(String)> cb)
+ 
 ========================== 
 
 ### 사용예시 
