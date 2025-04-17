@@ -53,7 +53,7 @@ void setup() {
 
 
 
-    if(carmeleon.Http.begin("wss://codi.farm/ws/test")){
+    if(carmeleon.Http.begin("wss://도메인/ws/test")){
         Serial.println("웹소켓 준비 됨");
     }else{
         Serial.println("웹소켓 준비 실패");

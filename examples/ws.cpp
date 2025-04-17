@@ -24,9 +24,9 @@ IPAddress dns1(168, 126, 63, 1); // DNS정보 (KT)
 IPAddress dns2(1, 1, 1, 1); //DNS2차정보 (cloudflare)
 
 WSEvent& evt = carmeleon.ws(
-    "wss://codi.farm/ws/689d2efc-2b88-494d-a5f6-a9d892b2f859",
+    "wss://도메인/ws/689d2efc-2b88-494d-a5f6-a9d892b2f859",
     { //Header 커스텀데이터
-        {"User-Agent", "FCO-OP-C-001"},
+        {"User-Agent", "유저에이전트"},
         {"Firmware-version", "0.1"},
         {"Macaddress", carmeleon.Eth.MACAddressString()},
         {"Localip", carmeleon.Eth.localIPString()}
