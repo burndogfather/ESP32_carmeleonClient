@@ -15,6 +15,7 @@ carmeleonClient 클래스의 주요특징 :
 - 기타 각종 독립적 이벤트처리
  
 이더넷을 사용하는 IoT기기를 개발함에 있어서 통합된 라이브러리를 통해 성능을 극대화한 것이 특징이며, 적은 플래시메모리를 사용합니다. 라이브러리의 각 메소드 전체 통합테스트 시 782Kb를 사용함으로 OTA펌웨어 다운로드 지원을 위한 충분한 사용량을 제공합니다. 
+ 
 ![Memory_used](https://github.com/user-attachments/assets/0b475c19-d7f7-4e17-a238-7a799d2c6cf2)
  
 테스트환경 : ESP32S Dev Module(Espressif) + W5500(WIZnet) 
