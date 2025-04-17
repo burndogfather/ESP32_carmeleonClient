@@ -21,8 +21,7 @@ carmeleonClient 클래스의 주요특징 :
 개발환경 : PlatformIO  
 서버환경 : Carmeleon Framework v3.0.0 (DADOL corp) 
  
-(Carmeleon Framework API연동 및 WSS통신 대응목적으로 개발된 라이브러리입니다) 
-(Carmeleon Framework가 아닌 HTTP 통신은 examples의 lowlevel을 활용할 수 있습니다) 
+(Carmeleon Framework API연동 및 WSS통신 대응목적으로 개발된 라이브러리입니다 Carmeleon Framework가 아닌 HTTP 통신은 examples의 lowlevel을 활용할 수 있습니다) 
  
 ========================== 
 
