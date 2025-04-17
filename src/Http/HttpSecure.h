@@ -21,8 +21,9 @@ class HttpSecure {
 public:
   HttpSecure();
 
+  bool connected();
   void KeepAlive(bool enabled);
-  bool handshake(const char* wsUrl);
+  bool handshake();
   void sendMsgString(const String& message);
   void sendMsgBinary(const std::vector<uint8_t>& data);
   void onConnected(std::function<void()> cb);

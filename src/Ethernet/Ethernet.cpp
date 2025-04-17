@@ -178,6 +178,25 @@ void EthernetClass::MACAddress(uint8_t *mac) {
   macAddress(mac);
 }
 
+String EthernetClass::MACAddressString() {
+  uint8_t mac[6];
+  if (ethHandle && esp_eth_ioctl(ethHandle, ETH_CMD_G_MAC_ADDR, mac) == ESP_OK) {
+    char buf[18];
+    snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    return String(buf);
+  }
+  return "00:00:00:00:00:00";  // 실패 시 fallback
+}
+
+String EthernetClass::localIPString() {
+  esp_netif_ip_info_t ip_info;
+  esp_netif_get_ip_info(_esp_netif, &ip_info);
+
+  IPAddress localIP = IPAddress(ip_info.ip.addr);
+  return localIP.toString();
+}
+
 IPAddress EthernetClass::dnsServerIP() {
   return dnsIP();
 }

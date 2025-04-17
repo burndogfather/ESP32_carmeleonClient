@@ -65,6 +65,8 @@ public:
 
   // legacy API functions
   void MACAddress(uint8_t *mac);
+  String MACAddressString();
+  String localIPString();
   IPAddress dnsServerIP();
   void setDnsServerIP(const IPAddress dns);
   void setHostname(const char* hostname);

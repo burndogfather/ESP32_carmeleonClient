@@ -29,6 +29,10 @@ HttpSecure::HttpSecure() {
 
 }
 
+bool HttpSecure::connected() {
+  return _connected;
+}
+
 
 void HttpSecure::littleFSTask(void* params) {
   LittleFSTaskParams* taskParams = (LittleFSTaskParams*)params;
@@ -94,25 +98,63 @@ void HttpSecure::websocketRecvTask(void* arg) {
       mbedtls_ctr_drbg_free(&self->_ctr_drbg);
     }
 
-    close(self->_socket);
-    self->_socket = -1;
-
-    if (self->_onDisconnected) {
-      self->_onDisconnected();  // 👉 여기서 한 번만 호출
+    // 소켓 닫기
+    if (self->_socket != -1) {
+      close(self->_socket);
+      self->_socket = -1;
     }
+
+    // 연결 끊김 콜백 호출
+    if (self->_onDisconnected) {
+      self->_onDisconnected();
+    }
+    
   }
 
-  self->_wsRecvTask = nullptr;
+  
 
   if (self->_keepAlive && !self->_lastWsUrl.isEmpty()) {
-    Serial.println("[HTTP] KeepAlive: 연결 끊김 감지 → 재연결 시도");
-    while (!self->handshake(self->_lastWsUrl.c_str())) {
-      Serial.println("[HTTP] KeepAlive: 재연결 실패 → 재시도");
-      delay(1000);  // 1초 간격 재시도
+
+    // 현재 태스크 핸들 저장 후 초기화 (중복 생성 방지)
+    TaskHandle_t thisTask = self->_wsRecvTask;
+    self->_wsRecvTask = nullptr;
+
+    
+    Serial.println("[HTTP] 웹소켓 재연결 시도");
+
+    while (self->_keepAlive) {
+
+      Serial.println("[HTTP] 웹소켓 재연결 시도중");
+      
+      delay(200);
+      
+      if (self->begin(self->_lastWsUrl.c_str()) && self->handshake()) {
+
+        // 새로운 수신 태스크 생성
+        if (self->_wsRecvTask == nullptr) {
+          xTaskCreate(
+            websocketRecvTask,
+            "ws_recv_task",
+            4096,
+            self,
+            1,
+            &self->_wsRecvTask
+          );
+        }
+        
+        break;
+      }
+
     }
+    
+    //현재 테스크 종료
+    self->_wsRecvTask = nullptr;
+    vTaskDelete(NULL);
+    
   }
 
-
+  //일반 종료처리
+  self->_wsRecvTask = nullptr;
   vTaskDelete(NULL);
 }
 
@@ -120,23 +162,12 @@ void HttpSecure::websocketRecvTask(void* arg) {
 
 bool HttpSecure::begin(const char* fullUrl) {
 
-
-  // 기존 연결 및 SSL 상태 정리
-  end();  
-  _isSecure = false;
-  _port = 0;
-  _host = "";
-  _path = "/";
-  _headers.clear();
-  _responseHeaders.clear();
-  _response = "";
-  _statusCode = -1;
-
-
   String url = fullUrl;
   url.trim(); // 🔥 앞뒤 공백 제거
   String lower = url;
   lower.toLowerCase(); // 🔥 대소문자 무시 처리
+
+  _lastWsUrl = lower;
 
   // LittleFS 초기화가 아직 시작되지 않았을 때만 태스크 생성
   if (!_littlefsInitialized && _littlefsTask == NULL) {
@@ -192,17 +223,18 @@ bool HttpSecure::begin(const char* fullUrl) {
 
   _path = (slashIndex < url.length()) ? url.substring(slashIndex) : "/";
 
+
   // 3. DNS → IP
   IPAddress ip;
   if (!Ethernet.hostByName(_host.c_str(), ip)) {
-    Serial.println("[HTTP] DNS 실패");
+    Serial.println("[HTTP] DNS질의 실패");
     return false;
   }
 
   // 4. 소켓 연결
   _socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (_socket < 0) {
-    Serial.println("[HTTP] 소켓 생성 실패");
+    Serial.println("[HTTP] socket() 생성 실패");
     return false;
   }
 
@@ -212,7 +244,7 @@ bool HttpSecure::begin(const char* fullUrl) {
   server.sin_addr.s_addr = ip;
 
   if (connect(_socket, (struct sockaddr*)&server, sizeof(server)) != 0) {
-    Serial.println("[HTTP] 서버 연결 실패");
+    Serial.println("[HTTP] connect() 연결 실패");
     close(_socket);
     return false;
   }
@@ -254,7 +286,7 @@ bool HttpSecure::begin(const char* fullUrl) {
       if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE) {
         char errbuf[128];
         mbedtls_strerror(ret, errbuf, sizeof(errbuf));
-        Serial.printf("[HTTP] SSL핸드셰이크 실패: %s\n", errbuf);
+        Serial.printf("[HTTP] mbedtls_* 실패: %s\n", errbuf);
         close(_socket);
         return false;
       }
@@ -278,12 +310,10 @@ void HttpSecure::KeepAlive(bool enabled) {
   _keepAlive = enabled;
 }
 
-bool HttpSecure::handshake(const char* wsUrl) {
-  if (!begin(wsUrl)) return false;
-
-  _lastWsUrl = wsUrl;
-
+bool HttpSecure::handshake() {
+  
   _isWebSocket = true;
+
   uint8_t randomKey[16];
   esp_fill_random(randomKey, sizeof(randomKey));
   size_t encodedLen;
@@ -301,6 +331,7 @@ bool HttpSecure::handshake(const char* wsUrl) {
   int status = get();
   if (status == 101) {
     _connected = true;
+
     if (_onHandshake) {
       _onHandshake();
     }
@@ -383,8 +414,7 @@ void HttpSecure::readFrame() {
   uint8_t hdr[2];
   int hdrLen = _read(hdr, 2);
   if (hdrLen <= 0) {
-    Serial.println("[HTTP] 헤더 수신 실패");
-    end();
+    _connected = false;
     return;
   }
 
@@ -408,7 +438,7 @@ void HttpSecure::readFrame() {
 
   if (payloadLen > 4096) {
     Serial.printf("[HTTP] payload too large: %llu bytes\n", payloadLen);
-    end();
+    _connected = false;
     return;
   }
 
@@ -465,7 +495,7 @@ void HttpSecure::readFrame() {
         break;
       }
       default: {
-        Serial.printf("[HTTP] 알 수 없는 opcode: 0x%02X\n", opcode);
+        Serial.printf("[HTTP] 알 수 없는 웹소켓 opcode: 0x%02X\n", opcode);
         break;
       }
     }
@@ -613,49 +643,79 @@ int HttpSecure::statusCode() {
 
 void HttpSecure::end() {
   if (!_connected) return;
-  _connected = false;  // 연결 끊기 플래그만 설정 (실제 정리는 websocketRecvTask에서 처리)
-  _keepAlive = false;  //keepAlive는 먹히지 않음
 
+  _connected = false;  // 연결 끊기 플래그만 설정 (실제 정리는 websocketRecvTask에서 처리)
+
+  // 기존 연결 및 SSL 상태 정리
   if (_isWebSocket) {
     // WebSocket close 프레임 전송
     uint8_t closeFrame[2] = { 0x88, 0x00 }; // FIN + opcode=8 (Close)
     _write(closeFrame, 2);
     delay(20); // 서버에 close 전달 대기
 
-  }else{
-
-    if (_isSecure) {
-      mbedtls_ssl_close_notify(&_ssl);
-      mbedtls_ssl_free(&_ssl);
-      mbedtls_ssl_config_free(&_conf);
-      mbedtls_ctr_drbg_free(&_ctr_drbg);
-    }
-  
-    if (_socket != -1) {
-      close(_socket);
-      _socket = -1;
-    }
-  
-    if (_wsRecvTask != nullptr) {
-      vTaskDelete(_wsRecvTask);
-      _wsRecvTask = nullptr;
-    }
-  
-    if (_onDisconnected) {
-      _onDisconnected();
-    }
-
   }
+
+  // 태스크가 정리될 때까지 대기 (최대 1초)
+  uint32_t timeout = millis() + 1000;
+  while (_wsRecvTask != nullptr && millis() < timeout) {
+    delay(10);
+  }
+
+  if (_isSecure) {
+    mbedtls_ssl_close_notify(&_ssl);
+    mbedtls_ssl_free(&_ssl);
+    mbedtls_ssl_config_free(&_conf);
+    mbedtls_ctr_drbg_free(&_ctr_drbg);
+  }
+
+  if (_socket != -1) {
+    close(_socket);
+    _socket = -1;
+  }
+  
+  // 상태 변수 초기화
+  _isSecure = false;
+  _isWebSocket = false; 
+  _port = 0;
+  _host = "";
+  _path = "/";
+  if(!_keepAlive){
+    _headers.clear();
+  }
+  _responseHeaders.clear();
+  _response = "";
+  _statusCode = -1;
+
+
 
 }
 
 
 int HttpSecure::_write(const uint8_t* buf, size_t len) {
+
+  if (!_connected) return -1;
+
+
+  int ret;
   if (_isSecure) {
-    return mbedtls_ssl_write(&_ssl, buf, len);
+    ret = mbedtls_ssl_write(&_ssl, buf, len);
   } else {
-    return send(_socket, buf, len, 0);
+    ret = send(_socket, buf, len, 0);
   }
+
+  if (ret < 0) {
+    char errBuf[128];
+    if (_isSecure) {
+      mbedtls_strerror(ret, errBuf, sizeof(errBuf));
+    } else {
+      snprintf(errBuf, sizeof(errBuf), "errno=%d", errno);
+    }
+    Serial.printf("[HTTP] _write() 전송 오류: %s\n", errBuf);
+    end(); // 오류 발생 시 연결 종료
+  }
+  
+  return ret;
+
 }
 
 int HttpSecure::_read(uint8_t* buf, size_t len) {
@@ -692,7 +752,9 @@ void HttpSecure::sendRequest(const String& method, const String& body, const Str
 
   req += "Connection: close\r\n\r\n";
 
+
   if (body.length()) req += body;
+
 
   int ret = _write((const uint8_t*)req.c_str(), req.length());
   if (ret < 0) {
