@@ -72,8 +72,66 @@ extra_scripts =
 - carmeleonClient.Eth.printDriverInfo(Print &out)
 - carmeleonClient.Eth.linkStatus()
 - carmeleonClient.Eth.hardwareStatus()
-- carmeleonClient.Eth.end()
-
+- carmeleonClient.Eth.end() 
+ 
+ 
+API관련 Method 목록 
+- Response carmeleonClient.api(const String& url, std::initializer_list<std::pair<const char*, JsonVariantWrapper>> params = {})
+- Response->prettyPrint() 
+- Response->json
+- Response->json.containsKey("key")
+- Response->["key"]
+- Response->["key"][i]
+- Response->["key"].is<T>()
+- Response->["key"].as<T>()
+ 
+ 
+WS관련 Method 목록 
+- WSEvent& carmeleonClient.ws(const String& url, const std::map<String,String>& headers)
+- WSEvent->start()
+- WSEvent->KeepAlive(bool enable)
+- WSEvent->onConnected(std::function<void()> cb)
+- WSEvent->onDisconnected(std::function<void()> cb)
+- WSEvent->onReceiveString(std::function<void(String)> cb)
+- WSEvent->onReceive(std::function<void(Response)> cb)
+- WSEvent->onSend(std::function<void(String)> cb)
+- WSEvent->send(const String& msg)
+- WSEvent->send(const std::vector<uint8_t>& binaryData)
+- WSEvent->send(JsonDocument& doc)
+- WSEvent->send(std::initializer_list<std::pair<const char*, JsonVariantWrapper>> kv)
+- WSEvent->end()
+ 
+ 
+LowLevel HTTP Method 목록 
+- carmeleonClient.Http.begin(const char* url)
+- carmeleonClient.Http.requestHeader(const String& name, const String& value)
+- carmeleonClient.Http.responseHeader(const String& name)
+- carmeleonClient.Http.printAllResponseHeaders()
+- carmeleonClient.Http.responseBody()
+- carmeleonClient.Http.statusCode()
+- carmeleonClient.Http.printAllCookies()
+- carmeleonClient.Http.clearAllCookies()
+- carmeleonClient.Http.getCookie(const String& domain, const String& name)
+- carmeleonClient.Http.setCookie(const String& domain, const String& name, const String& value, time_t expire)
+- carmeleonClient.Http.removeCookie(const String& domain, const String& name)
+- carmeleonClient.Http.debugCookiesystem()
+- carmeleonClient.Http.get()
+- carmeleonClient.Http.post(const String& body, const String& contentType)
+- carmeleonClient.Http.put(const String& body, const String& contentType)
+- carmeleonClient.Http.patch(const String& body, const String& contentType)
+- carmeleonClient.Http.del()
+- carmeleonClient.Http.head()
+- carmeleonClient.Http.handshake()
+- carmeleonClient.Http.KeepAlive(bool enabled)
+- carmeleonClient.Http.connected()
+- carmeleonClient.Http.sendMsgString(const String& message)
+- carmeleonClient.Http.sendMsgBinary(const std::vector<uint8_t>& data)
+- carmeleonClient.Http.onConnected(std::function<void()> cb)
+- carmeleonClient.Http.onHandshake(std::function<void()> cb)
+- carmeleonClient.Http.onDisconnected(std::function<void()> cb)
+- carmeleonClient.Http.onMsgString(std::function<void(String)> cb)
+- carmeleonClient.Http.onMsgBinary(std::function<void(std::vector<uint8_t>)> cb)
+- carmeleonClient.Http.end()
  
 ========================== 
 
