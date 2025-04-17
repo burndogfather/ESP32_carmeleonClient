@@ -1,7 +1,7 @@
 ESP32 Carmeleon Client
 ================
 
-ESP32 Carmeleon Client는 Carmeleon서버와 실시간 스트림통신을 ESP32에서 손쉽게 구현하기 위한 통합 라이브러리입니다. 
+ESP32 Carmeleon Client는 Carmeleon서버와 AES암호화통신을 활용한 API요청이나 스트림기반의 소켓통신을 ESP32에서 손쉽게 구현하기 위한 통합 라이브러리입니다. 
 
 carmeleonClient 클래스의 주요특징 : 
 - Carmeleon Framework 간 API/WSS 통신기능 지원
@@ -19,6 +19,7 @@ carmeleonClient 클래스의 주요특징 :
 서버환경 : Carmeleon Framework v3.0.0 (DADOL corp) 
 (Carmeleon Framework API연동 및 WSS통신 대응목적으로 개발된 라이브러리입니다) 
  
+================ 
 
 ### 중요사항 
 PlatformIO 프로젝트 폴더 내부에 "platformio.ini" 파일을 아래와 같이 수정해주시길 바랍니다. 
@@ -47,8 +48,11 @@ extra_scripts =
 	#pre:erase_flash.py # OTA이후 파티션이 정리되지 않아 쓰기를 못하면 이것을 활성화하면 업로드직전에 포맷한다
 	./littlefsbuilder.py
 ```
+ 
+================ 
 
-### 사용예시
+### 사용예시 
+[여기에](https://github.com/burndogfather/ESP32_carmeleonClient/tree/master/examples)에서 각 기능별로 사용예제를 확인할 수 있습니다. 
 ```c++
 #include <Arduino.h>
 #include <carmeleonClient.h>
