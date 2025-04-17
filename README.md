@@ -17,6 +17,7 @@ carmeleonClient 클래스의 주요특징 :
 테스트환경 : ESP32S Dev Module(Espressif) + W5500(WIZnet) 
 개발환경 : PlatformIO  
 서버환경 : Carmeleon Framework v3.0.0 (DADOL corp) 
+ 
 (Carmeleon Framework API연동 및 WSS통신 대응목적으로 개발된 라이브러리입니다) 
  
 ================ 
