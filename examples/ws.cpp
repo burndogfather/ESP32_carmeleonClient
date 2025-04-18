@@ -20,7 +20,7 @@ D34-RST
 */
 
 const char* UserAgent = "CARMELEON_CLIENT";
-byte mac[] = { 0xFA, 0xC0, 0x00, 0x00, 0x00, 0x01 };  // 맥주소
+byte mac[] = { 0x1A, 0xAA, 0xBB, 0xCC, 0x00, 0x01 };  // 맥주소
 IPAddress dns1(168, 126, 63, 1); // DNS정보 (KT)
 IPAddress dns2(1, 1, 1, 1); //DNS2차정보 (cloudflare)
 
