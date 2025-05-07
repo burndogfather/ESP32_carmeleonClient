@@ -56,7 +56,7 @@ public:
 
 private:
 
-  bool _keepAlive = false;
+  volatile bool _keepAlive = false;
   String _lastWsUrl = "";
 
   bool _isWebSocket = false;

@@ -111,7 +111,6 @@ void HttpSecure::websocketRecvTask(void* arg) {
     
   }
 
-  
 
   if (self->_keepAlive && !self->_lastWsUrl.isEmpty()) {
 
@@ -349,6 +348,7 @@ bool HttpSecure::handshake() {
 
     return true;
   }
+
   return false;
 }
 
