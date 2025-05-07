@@ -135,17 +135,16 @@ WSEvent::WSEvent(HttpSecure* http, const String& url)
 
 void WSEvent::KeepAlive(bool enable) {
   _keepAlive = enable;
-  if (_http) _http->KeepAlive(enable);
 }
 
 void WSEvent::start() {
   if (!_http->begin(_url.c_str())) {
     Serial.println("WebSocket begin 실패");
+    _WSconn = false;
     if (_onDisconnected) _onDisconnected();
     return;
   }
 
-  //라다이렉트후 KeepAlive 유지
   _http->KeepAlive(_keepAlive);
 
   _http->onHandshake([this]() {
@@ -153,6 +152,7 @@ void WSEvent::start() {
   });
 
   _http->onDisconnected([this]() {
+    _WSconn = false;
     if (_onDisconnected) _onDisconnected();
   });
 
@@ -196,7 +196,8 @@ void WSEvent::start() {
         
           Serial.printf("redirect 감지 → 재연결 시도: %s\n", newUrl.c_str());
         
-          KeepAlive(false);
+          _WSconn = false;
+          _http->KeepAlive(false);
           _http->end();
           _url = newUrl;
         
@@ -205,18 +206,23 @@ void WSEvent::start() {
           }
         
           if (!_http->begin(_url.c_str())) {
+            _WSconn = false;
             if (_onDisconnected) _onDisconnected();
             return;
           }
 
           //라다이렉트후 KeepAlive 유지
-          _http->KeepAlive(_keepAlive); 
-        
+          if(_keepAlive){
+            _http->KeepAlive(_keepAlive); 
+          }
+          
           if (!_http->handshake()) {
+            _WSconn = false;
             if (_onDisconnected) _onDisconnected();
             return;
           }
         
+          _WSconn = true;
           if (_onConnected) _onConnected();
           return;
         }
@@ -232,6 +238,7 @@ void WSEvent::start() {
   });
 
   if (!_http->handshake()) {
+    _WSconn = false;
     Serial.println("WebSocket handshake 실패");
     if (_onDisconnected) _onDisconnected();
   }
@@ -239,6 +246,7 @@ void WSEvent::start() {
 
 void WSEvent::close() {
   if (_http){
+    _WSconn = false;
     _http->KeepAlive(false);
     _http->sendMsgString("bye");
     _http->end();
@@ -253,12 +261,24 @@ void WSEvent::onReceive(std::function<void(Response)> cb) { _onReceive = cb; }
 void WSEvent::onSend(std::function<void(String)> cb) { _onSend = cb; }
 
 void WSEvent::send(const String& msg) {
-  if (_http) _http->sendMsgString(msg);
+  if(!_http){
+    return;
+  }
+  if(!_WSconn){
+    return;
+  }
+  _http->sendMsgString(msg);
   if (_onSend) _onSend(msg);
 }
 
 void WSEvent::send(const std::vector<uint8_t>& binaryData) {
-  if (_http) _http->sendMsgBinary(binaryData);
+  if(!_http){
+    return;
+  }
+  if(!_WSconn){
+    return;
+  }
+  _http->sendMsgBinary(binaryData);
   if (_onSend) {
     String hexStr;
     for (uint8_t b : binaryData) {
@@ -272,10 +292,16 @@ void WSEvent::send(const std::vector<uint8_t>& binaryData) {
 }
 
 void WSEvent::send(JsonDocument& doc) {
+  if(!_http){
+    return;
+  }
+  if(!_WSconn){
+    return;
+  }
   std::vector<uint8_t> binaryData;
   VecWriter writer(binaryData);  
   serializeMsgPack(doc, writer);  
-  if (_http) _http->sendMsgBinary(binaryData);
+  _http->sendMsgBinary(binaryData);
 
   if (_onSend) {
     String jsonStr;
@@ -285,6 +311,13 @@ void WSEvent::send(JsonDocument& doc) {
 }
 
 void WSEvent::send(std::initializer_list<std::pair<const char*, JsonVariantWrapper>> kv) {
+  if(!_http){
+    return;
+  }
+  if(!_WSconn){
+    return;
+  }
+
   String jsonStr = "{";
   _buildJson(jsonStr, kv); 
   jsonStr += "}";
@@ -296,7 +329,7 @@ void WSEvent::send(std::initializer_list<std::pair<const char*, JsonVariantWrapp
   VecWriter writer(binaryData);  
   serializeMsgPack(doc, writer);
 
-  if (_http) _http->sendMsgBinary(binaryData);
+  _http->sendMsgBinary(binaryData);
 
   if (_onSend) {
     _onSend(jsonStr);

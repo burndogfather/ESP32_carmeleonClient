@@ -52,6 +52,7 @@ class WSEvent : public JsonBuilder {
   private:
     HttpSecure* _http;
     bool _keepAlive = false;
+    bool _WSconn = false;
     String _url;
     std::map<String, String> _customHeaders;
 
